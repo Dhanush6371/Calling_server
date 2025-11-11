@@ -2,19 +2,24 @@
 const express = require("express");
 const cors = require("cors");
 const { MongoClient } = require("mongodb");
+require("dotenv").config();
 
 // ---------- Configurations ----------
 const app = express();
 app.use(express.json());
 app.use(cors());
 
-// ---------- Hardcoded MongoDB Connection ----------
-const MONGO_URI =
-  "mongodb+srv://financials:financials@financials.6f1amos.mongodb.net/?retryWrites=true&w=majority&appName=Financials";
-const PORT = 5000;
+// ---------- MongoDB Connection ----------
+const MONGO_URI = process.env.MONGO_URI;
+const PORT = process.env.PORT || 5000;
+
+if (!MONGO_URI) {
+  console.error("❌ Missing MONGO_URI in environment variables.");
+  process.exit(1);
+}
 
 let client;
-let dbConnections = {}; // cache per database
+let dbConnections = {}; // Cache per database
 
 async function connectDB() {
   try {
@@ -29,12 +34,10 @@ async function connectDB() {
 
 function getDB(restaurantName) {
   // Map frontend selection to specific database names
-  let dbName;
-  if (restaurantName.toLowerCase() === "bhawarchi") {
-    dbName = "bhawarchi";
-  } else {
-    dbName = "Bansari_Restaurant"; // default
-  }
+  const dbName =
+    restaurantName.toLowerCase() === "bhawarchi"
+      ? "bhawarchi"
+      : "Bansari_Restaurant"; // Default database
 
   if (!dbConnections[dbName]) {
     dbConnections[dbName] = client.db(dbName);
@@ -60,7 +63,9 @@ app.get("/api/orders", async (req, res) => {
   try {
     const restaurant = req.query.restaurant || "bansari";
     const { ordersCollection } = getCollections(restaurant);
-    const orders = await ordersCollection.find({}, { projection: { _id: 0 } }).toArray();
+    const orders = await ordersCollection
+      .find({}, { projection: { _id: 0 } })
+      .toArray();
     res.json(orders);
   } catch (error) {
     console.error("❌ Error fetching orders:", error);
@@ -73,7 +78,9 @@ app.get("/api/reservations", async (req, res) => {
   try {
     const restaurant = req.query.restaurant || "bansari";
     const { reservationsCollection } = getCollections(restaurant);
-    const reservations = await reservationsCollection.find({}, { projection: { _id: 0 } }).toArray();
+    const reservations = await reservationsCollection
+      .find({}, { projection: { _id: 0 } })
+      .toArray();
     res.json(reservations);
   } catch (error) {
     console.error("❌ Error fetching reservations:", error);
@@ -88,8 +95,12 @@ app.get("/api/stats", async (req, res) => {
     const { ordersCollection } = getCollections(restaurant);
 
     const totalOrders = await ordersCollection.countDocuments({});
-    const confirmedOrders = await ordersCollection.countDocuments({ "items.status": "confirmed" });
-    const deliveredOrders = await ordersCollection.countDocuments({ "items.status": "delivered" });
+    const confirmedOrders = await ordersCollection.countDocuments({
+      "items.status": "confirmed",
+    });
+    const deliveredOrders = await ordersCollection.countDocuments({
+      "items.status": "delivered",
+    });
 
     const orders = await ordersCollection.find({}).toArray();
     const revenue = orders.reduce((acc, order) => {
